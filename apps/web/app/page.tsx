@@ -8,9 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Metric, Model } from "@/lib/types";
 import { METRICS, MODELS } from "@/lib/consts";
 import { evaluateRequest } from "@/lib/api";
-import { sendEvaluateRequest } from "@/app/actions/api";
+import { useRouter } from "next/navigation";
 
 export default function Home() {
+  const router = useRouter();
   const [selectedModels, setSelectedModels] = useState<Model[]>([]);
   const [orderedMetrics, setOrderedMetrics] = useState<Metric[]>([]);
   const [input, setInput] = useState<string>("");
@@ -52,30 +53,19 @@ export default function Home() {
       return;
     }
 
-    try {
-      // Call the API function with validated data
-      const response = await sendEvaluateRequest(result.data);
+    // Navigate to results page with query parameters
+    const params = new URLSearchParams({
+      prompt: result.data.prompt,
+      models: result.data.models.join(","),
+      metrics: result.data.metrics.join(","),
+    });
 
-      if (!response.ok) {
-        throw new Error(`API request failed: ${response.statusText}`);
-      }
-
-      // Handle successful response
-      console.log("Request sent successfully");
-      // TODO: Handle the response (e.g., display results)
-    } catch (error) {
-      console.error("Error submitting request:", error);
-      setErrors({
-        general: "An error occurred while submitting the request",
-      });
-    } finally {
-      setIsLoading(false);
-    }
+    router.push(`/results?${params.toString()}`);
   };
 
   return (
     <main className="flex min-h-screen w-full flex-col items-center gap-10 py-20 px-16 max-w-4xl mx-auto">
-      <h1 className="text-8xl font-serif">Anubis</h1>
+      <h1 className="text-8xl font-serif">𓁣 Anubis</h1>
       <div className="w-full flex flex-col gap-2">
         <Textarea
           value={input}
@@ -120,7 +110,7 @@ export default function Home() {
       )}
 
       <Button
-        className="w-full"
+        className="w-full cursor-pointer"
         type="submit"
         aria-label="submit"
         onClick={handleSubmit}
