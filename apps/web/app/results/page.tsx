@@ -254,7 +254,7 @@ export default function ResultsPage() {
     <main className="flex min-h-screen w-full flex-col items-center gap-8 py-20 px-16 max-w-6xl mx-auto">
       <div className="w-full flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-6xl font-serif">Anubis</h1>
+          <h1 className="text-6xl font-serif">𓁣 Anubis</h1>
           <h2 className="font-mono">Evaluation Results</h2>
         </div>
         <Button size="lg" asChild>
