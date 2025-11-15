@@ -10,6 +10,15 @@ import {
   CodeBlockFiles,
   CodeBlockFilename,
 } from "@/components/ui/shadcn-io/code-block";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { MaximizeIcon } from "lucide-react";
 
 // Helper function to clean code fences from code
 function cleanCodeFences(code: string): string {
@@ -95,7 +104,48 @@ export function RecommendationSection({
                   </CodeBlockFilename>
                 )}
               </CodeBlockFiles>
-              <CodeBlockCopyButton className="ml-auto" />
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="shrink-0 ml-auto"
+                  >
+                    <MaximizeIcon className="text-muted-foreground" size={14} />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-screen max-h-[90vh] overflow-auto">
+                  <DialogHeader>
+                    <DialogTitle>
+                      Recommended: {recommendation.bestModel}
+                    </DialogTitle>
+                  </DialogHeader>
+                  <CodeBlock
+                    defaultValue="python"
+                    data={[
+                      {
+                        language: "python",
+                        filename: `${recommendation.bestModel}.py`,
+                        code: cleanCode,
+                      },
+                    ]}
+                  >
+                    <CodeBlockBody>
+                      {(item) => (
+                        <CodeBlockItem
+                          key={item.language}
+                          value={item.language}
+                        >
+                          <CodeBlockContent language="python">
+                            {item.code}
+                          </CodeBlockContent>
+                        </CodeBlockItem>
+                      )}
+                    </CodeBlockBody>
+                  </CodeBlock>
+                </DialogContent>
+              </Dialog>
+              <CodeBlockCopyButton />
             </CodeBlockHeader>
             <CodeBlockBody>
               {(item) => (

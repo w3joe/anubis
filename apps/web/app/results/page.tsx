@@ -1,48 +1,21 @@
 "use client";
 
-import { useSearchParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import {
-  Model,
-  Metric,
-  ModelResult,
-  Recommendation,
-  Warning,
-  StreamEvent,
-  EvaluationMetrics,
-} from "@/lib/types";
 import { ModelOutputCard } from "@/components/model-output-card";
 import { RecommendationSection } from "@/components/recommendation-section";
-import { WarningsSection } from "@/components/warnings-section";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { WarningsSection } from "@/components/warnings-section";
+import {
+  Metric,
+  Model,
+  ModelResult,
+  Recommendation,
+  StreamEvent,
+  Warning,
+} from "@/lib/types";
 import Link from "next/link";
-
-// Helper function to generate pros and cons from metrics
-function generateProsAndCons(metrics: EvaluationMetrics): {
-  pros: string[];
-  cons: string[];
-} {
-  const pros: string[] = [];
-  const cons: string[] = [];
-
-  Object.entries(metrics).forEach(([key, value]) => {
-    const metricName = key.replace(/_/g, " ");
-    const score = value.score;
-    const notes = value.notes;
-
-    if (score >= 8) {
-      pros.push(`Excellent ${metricName} (${score}/10): ${notes}`);
-    } else if (score >= 6.5) {
-      pros.push(`Good ${metricName} (${score}/10): ${notes}`);
-    } else if (score >= 5) {
-      cons.push(`Moderate ${metricName} (${score}/10): ${notes}`);
-    } else {
-      cons.push(`Poor ${metricName} (${score}/10): ${notes}`);
-    }
-  });
-
-  return { pros, cons };
-}
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 
 export default function ResultsPage() {
   const searchParams = useSearchParams();
@@ -198,8 +171,9 @@ export default function ResultsPage() {
           const currentResult = prev[event.model];
           if (!currentResult) return prev;
 
-          // Generate pros and cons from metrics
-          const { pros, cons } = generateProsAndCons(event.metrics);
+          // Extract pros and cons from backend's notes object
+          const pros = event.notes?.pros || [];
+          const cons = event.notes?.cons || [];
 
           return {
             ...prev,
@@ -278,11 +252,25 @@ export default function ResultsPage() {
 
   return (
     <main className="flex min-h-screen w-full flex-col items-center gap-8 py-20 px-16 max-w-6xl mx-auto">
-      <div className="w-full flex flex-col items-center gap-4">
-        <h1 className="text-6xl font-serif">Evaluation Results</h1>
-        <p className="text-muted-foreground text-center max-w-2xl">{prompt}</p>
+      <div className="w-full flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-6xl font-serif">Anubis</h1>
+          <h2 className="font-mono">Evaluation Results</h2>
+        </div>
+        <Button size="lg" asChild>
+          <Link href="/">New Evaluation</Link>
+        </Button>
       </div>
 
+      <div className="flex flex-col gap-3 w-full">
+        <Label htmlFor="prompt">Your Prompt</Label>
+        <span
+          id="prompt"
+          className="p-4 bg-white/75 border shadow-sm rounded-md"
+        >
+          {prompt}
+        </span>
+      </div>
       {error && (
         <div className="w-full p-4 bg-red-50 border border-red-200 rounded-md">
           <p className="text-sm text-red-800">{error}</p>

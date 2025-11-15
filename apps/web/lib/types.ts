@@ -28,6 +28,10 @@ export type EvaluationResultEvent = {
   model: Model;
   overall_score: number;
   metrics: Record<Metric, { score: number; notes: string }>;
+  notes: {
+    pros: string[];
+    cons: string[];
+  };
 };
 
 export type SummaryEvent = {
