@@ -126,7 +126,6 @@ class ReadabilityAnalyzer(BaseAnalyzer):
                 max_depth = max(max_depth, depth)
 
         return max_depth
-
     def _generate_notes(
         self,
         variable_score: float,
@@ -158,3 +157,4 @@ class ReadabilityAnalyzer(BaseAnalyzer):
             notes.append("lacks sufficient comments")
 
         return ", ".join(notes)
+

@@ -46,14 +46,28 @@ class OutputFormatter:
             # Format metrics according to SRS schema
             formatted_metrics = OutputFormatter._format_metrics(eval_result['metrics'])
 
+            # Extract LLM analysis results
+            llm_analysis = eval_result.get('llm_analysis', {})
+            pros = llm_analysis.get('pros', [])
+            cons = llm_analysis.get('cons', [])
+            language = llm_analysis.get('language', 'unknown')
+
+            # Create notes object with pros and cons arrays
+            notes = {
+                'pros': pros if isinstance(pros, list) else [],
+                'cons': cons if isinstance(cons, list) else []
+            }
+
             result = {
                 'model': model,
                 'overall_score': eval_result.get('overall_score', 0),
                 'generated_code': gen_result.get('generated_code', ''),
+                'language': language,
                 'metrics': formatted_metrics,
                 'execution_time_ms': gen_result.get('execution_time_ms', 0),
                 'success': gen_result.get('success', True),
-                'error': gen_result.get('error')
+                'error': gen_result.get('error'),
+                'notes': notes
             }
 
             results.append(result)
@@ -83,8 +97,7 @@ class OutputFormatter:
 
         for metric_name, metric_data in metrics.items():
             formatted[metric_name] = {
-                'score': metric_data.get('score', 0),
-                'notes': metric_data.get('notes', '')
+                'score': metric_data.get('score', 0)
             }
 
             # Add metric-specific fields
@@ -133,7 +146,8 @@ class OutputFormatter:
                 'best_generated_code': None,
                 'potential_issues': None,
                 'failed_evaluations': len(results),
-                'successful_evaluations': 0
+                'successful_evaluations': 0,
+                'language': 'unknown'
             }
 
         best_result = max(successful_results, key=lambda x: x.get('overall_score', 0))
@@ -143,6 +157,20 @@ class OutputFormatter:
         best_code = best_result.get('generated_code', '')
         issues_analysis = issues_analyzer.analyze(best_code) if best_code else {'issues_text': 'No code to analyze'}
 
+        # Detect language from results (use the most common language or from best result)
+        languages = []
+        for result in successful_results:
+            lang = result.get('language', 'unknown')
+            if lang != 'unknown':
+                languages.append(lang)
+        
+        # Get language from best result or use most common
+        detected_language = best_result.get('language', 'unknown')
+        if detected_language == 'unknown' and languages:
+            # Use most common language
+            from collections import Counter
+            detected_language = Counter(languages).most_common(1)[0][0]
+
         return {
             'total_models_tested': len(results),
             'successful_evaluations': len(successful_results),
@@ -150,5 +178,6 @@ class OutputFormatter:
             'best_model': best_result['model'],
             'best_score': best_result['overall_score'],
             'best_generated_code': best_code,
-            'potential_issues': issues_analysis.get('issues_text', 'No analysis available')
+            'potential_issues': issues_analysis.get('issues_text', 'No analysis available'),
+            'language': detected_language
         }

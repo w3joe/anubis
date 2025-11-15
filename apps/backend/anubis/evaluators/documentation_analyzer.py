@@ -100,7 +100,6 @@ class DocumentationAnalyzer(BaseAnalyzer):
             return 8.0
         else:
             return 5.0
-
     def _generate_notes(self, docstring_score: float, comment_score: float) -> str:
         """Generate human-readable notes about documentation."""
         notes = []
@@ -120,3 +119,4 @@ class DocumentationAnalyzer(BaseAnalyzer):
             notes.append("could use more inline comments")
 
         return ", ".join(notes)
+

@@ -114,7 +114,6 @@ class ComplexityAnalyzer(BaseAnalyzer):
         }
 
         return complexity_scores.get(complexity, 5.0)
-
     def _generate_notes(self, complexity: str) -> str:
         """Generate human-readable notes about complexity."""
         if complexity == 'O(1)':
@@ -133,3 +132,4 @@ class ComplexityAnalyzer(BaseAnalyzer):
             return 'Exponential time - very inefficient'
         else:
             return 'Could not determine complexity'
+

@@ -197,7 +197,8 @@ def evaluate_code_stream():
                     # Generation complete for this model
                     success = chunk_data['success']
                     exec_time = chunk_data.get('execution_time_ms', 0)
-                    print(f"[STREAM] [{model}] Generation complete - Success: {success}, Time: {exec_time}ms")
+                    language = chunk_data.get('language', 'Unknown')
+                    print(f"[STREAM] [{model}] Generation complete - Success: {success}, Time: {exec_time}ms, Language: {language}")
                     yield f"data: {json.dumps({'type': 'generation_complete', 'model': model, 'success': success, 'execution_time_ms': exec_time})}\n\n"
 
                     # Store result for evaluation
@@ -220,8 +221,23 @@ def evaluate_code_stream():
                                 metric_scores.append(f'{k}={v}')
                         print(f"[STREAM] [{model}] Metrics: {', '.join(metric_scores)}")
 
-                        # Send evaluation result
-                        yield f"data: {json.dumps({'type': 'evaluation_result', 'model': model, 'overall_score': evaluation['overall_score'], 'metrics': evaluation['metrics']})}\n\n"
+                        # Extract LLM analysis results
+                        llm_analysis = evaluation.get('llm_analysis', {})
+                        pros = llm_analysis.get('pros', [])
+                        cons = llm_analysis.get('cons', [])
+                        language = llm_analysis.get('language', 'unknown')
+                        
+                        # Format metrics (remove notes field from individual metrics)
+                        formatted_metrics = {}
+                        for metric_name, metric_data in evaluation['metrics'].items():
+                            formatted_metrics[metric_name] = {'score': metric_data.get('score', 0)}
+                            if 'detected_complexity' in metric_data:
+                                formatted_metrics[metric_name]['detected_complexity'] = metric_data['detected_complexity']
+                            if 'dependencies_count' in metric_data:
+                                formatted_metrics[metric_name]['dependencies_count'] = metric_data['dependencies_count']
+
+                        # Send evaluation result with language and notes
+                        yield f"data: {json.dumps({'type': 'evaluation_result', 'model': model, 'overall_score': evaluation['overall_score'], 'language': language, 'metrics': formatted_metrics, 'notes': {'pros': pros, 'cons': cons}})}\n\n"
                     else:
                         print(f"[STREAM] [{model}] Skipping evaluation - generation failed or no code generated")
 

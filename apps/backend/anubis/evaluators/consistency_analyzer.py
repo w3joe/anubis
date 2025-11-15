@@ -100,7 +100,6 @@ class ConsistencyAnalyzer(BaseAnalyzer):
                 score -= 1.0
 
         return max(0, score)
-
     def _generate_notes(self, naming_score: float, style_score: float) -> str:
         """Generate human-readable notes about consistency."""
         notes = []
@@ -118,3 +117,4 @@ class ConsistencyAnalyzer(BaseAnalyzer):
             notes.append("style inconsistencies found")
 
         return ", ".join(notes)
+

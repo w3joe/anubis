@@ -10,7 +10,8 @@ from .evaluators import (
     ConsistencyAnalyzer,
     ComplexityAnalyzer,
     DocumentationAnalyzer,
-    DependencyAnalyzer
+    DependencyAnalyzer,
+    LLMAnalyzer
 )
 
 
@@ -42,6 +43,9 @@ class CodeEvaluator:
             'code_documentation': DocumentationAnalyzer(),
             'external_dependencies': DependencyAnalyzer()
         }
+        
+        # Initialize LLM analyzer for pros/cons analysis
+        self.llm_analyzer = LLMAnalyzer()
 
     def _load_weights(self, config_path: str) -> Dict[str, float]:
         """Load metric weights from config file or use defaults."""
@@ -75,12 +79,16 @@ class CodeEvaluator:
         for metric_name, analyzer in self.analyzers.items():
             metrics[metric_name] = analyzer.analyze(code)
 
+        # Run LLM analyzer for pros/cons and language analysis
+        llm_analysis = self.llm_analyzer.analyze(code)
+
         # Calculate overall score with dynamic weights
         overall_score = self._calculate_overall_score(metrics, metrics_priority)
 
         return {
             'metrics': metrics,
-            'overall_score': round(overall_score, 2)
+            'overall_score': round(overall_score, 2),
+            'llm_analysis': llm_analysis
         }
 
     def evaluate_multiple(self, code_samples: List[Dict[str, str]]) -> List[Dict[str, any]]:

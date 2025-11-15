@@ -92,7 +92,6 @@ class DependencyAnalyzer(BaseAnalyzer):
             return 6.0
         else:
             return max(3.0, 10.0 - external_count)
-
     def _generate_notes(self, external_count: int, all_deps: Set[str]) -> str:
         """Generate human-readable notes about dependencies."""
         if external_count == 0:
@@ -106,3 +105,4 @@ class DependencyAnalyzer(BaseAnalyzer):
             return 'Few external dependencies'
         else:
             return f'Many external dependencies ({external_count})'
+
