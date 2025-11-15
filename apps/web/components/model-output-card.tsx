@@ -12,6 +12,15 @@ import {
   CodeBlockContent,
 } from "@/components/ui/shadcn-io/code-block";
 
+// Helper function to clean code fences from code
+function cleanCodeFences(code: string): string {
+  // Remove markdown code fences like ```python or ```
+  return code
+    .replace(/^```[\w]*\n?/gm, "") // Remove opening fence with optional language
+    .replace(/\n?```$/gm, "") // Remove closing fence
+    .trim();
+}
+
 interface ModelOutputCardProps {
   result: ModelResult;
 }
@@ -22,7 +31,10 @@ export function ModelOutputCard({ result }: ModelOutputCardProps) {
   const modelLabel =
     MODELS.find((m) => m.value === result.model)?.label || result.model;
 
-  const showCode = result.status === "complete" && result.code;
+  // Clean the code by removing markdown fences
+  const cleanCode = result.code ? cleanCodeFences(result.code) : "";
+
+  const showCode = result.status === "complete" && cleanCode;
   const showError = result.status === "error" && result.error;
   const showEvaluation =
     result.status === "complete" &&
@@ -74,7 +86,7 @@ export function ModelOutputCard({ result }: ModelOutputCardProps) {
               {
                 language: "python",
                 filename: "streaming.py",
-                code: result.code,
+                code: cleanCodeFences(result.code),
               },
             ]}
           >
@@ -110,7 +122,7 @@ export function ModelOutputCard({ result }: ModelOutputCardProps) {
                 className="relative cursor-pointer rounded-md border bg-muted p-4 max-h-32 overflow-hidden hover:border-primary/50 transition-all"
               >
                 <pre className="text-xs font-mono whitespace-pre-wrap line-clamp-4">
-                  {result.code}
+                  {cleanCode}
                 </pre>
                 <div className="absolute inset-0 bg-linear-to-b from-transparent via-muted/50 to-muted backdrop-blur-[1px] rounded-md flex items-end justify-center pb-2">
                   <span className="text-xs text-muted-foreground font-medium">
@@ -127,7 +139,7 @@ export function ModelOutputCard({ result }: ModelOutputCardProps) {
                     {
                       language: "python",
                       filename: "generated.py",
-                      code: result.code,
+                      code: cleanCode,
                     },
                   ]}
                 >

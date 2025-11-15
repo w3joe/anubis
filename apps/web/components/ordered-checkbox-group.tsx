@@ -63,12 +63,12 @@ export function OrderedCheckboxGroup<TValue extends string = string>({
             onClick={() => handleToggle(option.value)}
             className={cn(
               "inline-flex items-center gap-2.5 rounded-md px-4 py-2.5",
-              "text-sm font-medium transition-all outline-none",
+              "text-sm font-medium transition-all cursor-pointer",
               "border shadow-sm",
               "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
               isSelected
-                ? "bg-primary text-primary-foreground border-primary"
-                : "bg-background hover:bg-accent hover:text-accent-foreground"
+                ? "bg-primary text-primary-foreground"
+                : "bg-white/75 hover:bg-accent hover:text-accent-foreground"
             )}
           >
             <div

@@ -65,20 +65,26 @@ export default function Home() {
 
   return (
     <main className="flex min-h-screen w-full flex-col items-center gap-10 py-20 px-16 max-w-4xl mx-auto">
-      <h1 className="text-8xl font-serif">𓁣 Anubis</h1>
+      <div className="text-center">
+        <h1 className="text-8xl font-serif">𓁣 Anubis</h1>
+        <h2 className="text-xl font-mono">Weighing the code of the AI gods</h2>
+      </div>
       <div className="w-full flex flex-col gap-2">
+        <Label htmlFor="input">Your Prompt</Label>
         <Textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
           id="input"
           className="bg-white/75 h-32 relative text-md"
           placeholder="e.g., Write a function to sort an array using merge sort..."
+          autoFocus
         />
         {errors.prompt && (
           <p className="text-sm text-red-500">{errors.prompt}</p>
         )}
       </div>
       <div className="w-full flex flex-col gap-2">
+        <Label htmlFor="modelSelect">Select your model(s)</Label>
         <MultiSelect
           options={MODELS}
           selectedValues={selectedModels}
