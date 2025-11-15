@@ -234,6 +234,21 @@ The system shall evaluate each generated code sample against these metrics:
 - **Output:** Evaluation results JSON with weighted scoring and best generated code
 - **Status Codes:** 200 (success), 400 (bad input), 500 (server error)
 
+**POST /api/v1/evaluate/stream**
+- **Input:** JSON with prompt, models, and optional metrics priority array
+- **Output:** Server-Sent Events (SSE) stream with real-time code generation and evaluation
+- **Behavior:** When multiple models are specified, they execute in parallel with multiplexed output
+- **Event Types:**
+  - `generation_start`: Model begins generating code
+  - `code_chunk`: Incremental code chunk from model (chunks from different models may interleave)
+  - `generation_complete`: Model finished generating
+  - `evaluation_result`: Metrics and scores for generated code
+  - `summary`: Final summary with best code and rankings
+  - `complete`: Stream finished
+  - `error`: Error occurred during processing
+- **Status Codes:** 200 (success with streaming), 400 (bad input)
+- **Performance:** Multiple models generate code simultaneously, significantly reducing total time compared to sequential processing
+
 ---
 
 ### 9. Configuration Requirements
@@ -309,13 +324,23 @@ models:
 
 ---
 
-### 13. Recent Updates (v1.1)
+### 13. Recent Updates (v1.2)
 
-**Weighted Metrics Priority System:**
+**Streaming API Support:**
+- New `/api/v1/evaluate/stream` endpoint for real-time code generation
+- Uses Server-Sent Events (SSE) for incremental updates
+- Shows code appearing character-by-character as AI generates it
+- Provides live feedback on generation progress
+- Better UX for slow models with immediate visual feedback
+- **Parallel Execution:** Multiple models run simultaneously using threading, with multiplexed output showing chunks from any model as they arrive
+- Significantly reduced total time when comparing multiple models
+
+**Weighted Metrics Priority System (v1.1):**
 - Users can now specify metric priority order via `metrics` array in request
 - Higher-ranked metrics receive exponentially higher weights (0.7 decay rate)
 - AI models receive explicit instructions about metric priorities during generation
 - Summary now includes the best generated code for easy access
+- Potential issues analysis for best generated code
 
 **Example weighted scoring:**
 For metrics order: `["time_complexity", "readability", "consistency", "code_documentation", "external_dependencies"]`
@@ -325,7 +350,71 @@ For metrics order: `["time_complexity", "readability", "consistency", "code_docu
 - code_documentation: ~11.6% weight
 - external_dependencies: ~8.1% weight
 
-### 14. Future Enhancements (Out of Scope for Current Version)
+**Streaming Event Schema:**
+```javascript
+// Event types sent via SSE
+// Note: With parallel execution, chunks from different models may interleave
+{type: "generation_start", model: "gemini-2.0-flash-exp"}
+{type: "code_chunk", model: "gemini-2.0-flash-exp", chunk: "def is_prime(n):\n"}
+{type: "code_chunk", model: "gemini-1.5-pro", chunk: "def prime_check("}
+{type: "code_chunk", model: "gemini-2.0-flash-exp", chunk: "    if n < 2:\n"}
+{type: "generation_complete", model: "gemini-2.0-flash-exp", success: true, execution_time_ms: 2500}
+{type: "evaluation_result", model: "gemini-2.0-flash-exp", overall_score: 9.5, metrics: {...}}
+{type: "generation_complete", model: "gemini-1.5-pro", success: true, execution_time_ms: 3200}
+{type: "evaluation_result", model: "gemini-1.5-pro", overall_score: 8.7, metrics: {...}}
+{type: "summary", data: {...}, ranking: [...]}
+{type: "complete"}
+```
+
+### 14. Frontend Integration Examples
+
+**Using the Streaming API:**
+```javascript
+// Fetch with streaming - multiple models run in parallel
+const response = await fetch('http://localhost:5001/api/v1/evaluate/stream', {
+  method: 'POST',
+  headers: {'Content-Type': 'application/json'},
+  body: JSON.stringify({
+    prompt: 'Write a Python function to check if a number is prime',
+    models: ['gemini-2.0-flash-exp', 'gemini-1.5-pro'], // Both models run simultaneously
+    metrics: ['time_complexity', 'readability', 'consistency']
+  })
+});
+
+const reader = response.body.getReader();
+const decoder = new TextDecoder();
+
+// Track separate displays for each model
+const modelDisplays = {};
+
+while (true) {
+  const {done, value} = await reader.read();
+  if (done) break;
+
+  const chunk = decoder.decode(value);
+  const lines = chunk.split('\n');
+
+  for (const line of lines) {
+    if (line.startsWith('data: ')) {
+      const event = JSON.parse(line.slice(6));
+
+      if (event.type === 'generation_start') {
+        // Initialize display for this model
+        modelDisplays[event.model] = document.getElementById(`code-${event.model}`);
+      } else if (event.type === 'code_chunk') {
+        // Append chunk to the appropriate model's display
+        // Chunks from different models may interleave
+        modelDisplays[event.model].textContent += event.chunk;
+      } else if (event.type === 'summary') {
+        // Show final results
+        console.log('Best model:', event.data.best_model);
+      }
+    }
+  }
+}
+```
+
+### 15. Future Enhancements (Out of Scope for Current Version)
 
 - Web UI for visualization
 - Database storage for historical comparisons
@@ -334,6 +423,7 @@ For metrics order: `["time_complexity", "readability", "consistency", "code_docu
 - Multi-language support
 - Model fine-tuning recommendations
 - Configurable decay rate per request
+- WebSocket support as alternative to SSE
 
 ---
 
@@ -360,6 +450,6 @@ For metrics order: `["time_complexity", "readability", "consistency", "code_docu
 
 ---
 
-**Document Version:** 1.1
+**Document Version:** 1.2
 **Last Updated:** November 15, 2025
 **Author:** Anubis Team

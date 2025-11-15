@@ -5,7 +5,9 @@ Interfaces with Google ADK to generate code from different AI models.
 
 import os
 import time
-from typing import Dict, List, Optional
+import threading
+import queue
+from typing import Dict, List, Optional, Generator
 from google import genai
 from google.genai import types
 
@@ -157,6 +159,156 @@ Requirements:
 
         base_prompt += "\n\nCode:"
         return base_prompt
+
+    def generate_code_stream(
+        self,
+        prompt: str,
+        model: str,
+        metrics_priority: Optional[List[str]] = None
+    ):
+        """
+        Generate code from a single AI model with streaming support.
+
+        Args:
+            prompt: The coding task description.
+            model: The AI model identifier.
+            metrics_priority: Optional list of metrics in priority order for code generation focus.
+
+        Yields:
+            Dictionary containing:
+                - chunk: The text chunk from the model
+                - is_complete: Whether generation is complete
+                - generated_code: Full code (only when is_complete=True)
+                - execution_time_ms: Time taken (only when is_complete=True)
+                - success: Whether generation was successful
+                - error: Error message if failed
+        """
+        start_time = time.time()
+        accumulated_text = ""
+
+        try:
+            # Create a structured prompt for code generation
+            formatted_prompt = self._build_prompt(prompt, metrics_priority)
+
+            # Use streaming API
+            response_stream = self.client.models.generate_content_stream(
+                model=model,
+                contents=formatted_prompt
+            )
+
+            # Stream chunks as they arrive
+            for chunk in response_stream:
+                if chunk.text:
+                    accumulated_text += chunk.text
+                    yield {
+                        'chunk': chunk.text,
+                        'is_complete': False,
+                        'success': True,
+                        'error': None,
+                        'model': model
+                    }
+
+            # Generation complete
+            execution_time_ms = int((time.time() - start_time) * 1000)
+            generated_code = self._extract_code(accumulated_text)
+
+            yield {
+                'chunk': '',
+                'is_complete': True,
+                'generated_code': generated_code,
+                'execution_time_ms': execution_time_ms,
+                'success': True,
+                'error': None,
+                'model': model
+            }
+
+        except Exception as e:
+            execution_time_ms = int((time.time() - start_time) * 1000)
+            yield {
+                'chunk': '',
+                'is_complete': True,
+                'generated_code': '',
+                'execution_time_ms': execution_time_ms,
+                'success': False,
+                'error': str(e),
+                'model': model
+            }
+
+    def generate_code_multi_models_stream(
+        self,
+        prompt: str,
+        models: List[str],
+        metrics_priority: Optional[List[str]] = None
+    ) -> Generator[Dict[str, any], None, None]:
+        """
+        Generate code from multiple AI models in parallel with streaming support.
+
+        Args:
+            prompt: The coding task description.
+            models: List of AI model identifiers.
+            metrics_priority: Optional list of metrics in priority order for code generation focus.
+
+        Yields:
+            Dictionary containing events from all models as they arrive:
+                - chunk: The text chunk from a model
+                - model: Which model generated this chunk
+                - is_complete: Whether this model's generation is complete
+                - generated_code: Full code (only when is_complete=True)
+                - execution_time_ms: Time taken (only when is_complete=True)
+                - success: Whether generation was successful
+                - error: Error message if failed
+        """
+        # Shared queue for collecting chunks from all threads
+        chunk_queue = queue.Queue()
+
+        # Track completion status
+        completed_models = set()
+        total_models = len(models)
+
+        def stream_worker(model: str):
+            """Worker thread that streams code generation for a single model."""
+            try:
+                for chunk_data in self.generate_code_stream(prompt, model, metrics_priority):
+                    # Put chunk into shared queue
+                    chunk_queue.put(chunk_data)
+
+                    # If this model completed, mark it
+                    if chunk_data.get('is_complete'):
+                        completed_models.add(model)
+            except Exception as e:
+                # Put error into queue
+                chunk_queue.put({
+                    'chunk': '',
+                    'is_complete': True,
+                    'generated_code': '',
+                    'execution_time_ms': 0,
+                    'success': False,
+                    'error': str(e),
+                    'model': model
+                })
+                completed_models.add(model)
+
+        # Start all model threads
+        threads = []
+        for model in models:
+            thread = threading.Thread(target=stream_worker, args=(model,))
+            thread.daemon = True
+            thread.start()
+            threads.append(thread)
+
+        # Yield chunks as they arrive from any model
+        while len(completed_models) < total_models:
+            try:
+                # Get chunk with timeout to prevent hanging
+                chunk_data = chunk_queue.get(timeout=1.0)
+                yield chunk_data
+            except queue.Empty:
+                # No chunks available, continue waiting
+                continue
+
+        # Make sure all threads have finished
+        for thread in threads:
+            thread.join(timeout=1.0)
 
     def _extract_code(self, response_text: str) -> str:
         """

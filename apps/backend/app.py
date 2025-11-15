@@ -1,5 +1,6 @@
 import os
-from flask import Flask, request, jsonify
+import json
+from flask import Flask, request, jsonify, Response, stream_with_context
 from flask_cors import CORS
 from google import genai
 from google.genai import types
@@ -126,6 +127,97 @@ def gemini_chat():
             'success': False,
             'error': str(e)
         }), 500
+
+
+@app.route('/api/v1/evaluate/stream', methods=['POST'])
+def evaluate_code_stream():
+    """
+    Streaming endpoint: Real-time code generation and evaluation with SSE.
+
+    Expected JSON body:
+    {
+        "prompt": "Write a function to find the longest palindromic substring",
+        "models": ["gemini-2.0-flash-exp"],
+        "metrics": ["readability", "consistency", "time_complexity", "code_documentation", "external_dependencies"] (optional)
+    }
+
+    Streams Server-Sent Events (SSE) with incremental updates.
+    """
+    def generate():
+        try:
+            data = request.get_json()
+
+            # Validate input
+            if not data or 'prompt' not in data:
+                yield f"data: {json.dumps({'type': 'error', 'message': 'Missing prompt in request body'})}\n\n"
+                return
+
+            if not data.get('prompt', '').strip():
+                yield f"data: {json.dumps({'type': 'error', 'message': 'Prompt cannot be empty'})}\n\n"
+                return
+
+            if 'models' not in data or not data['models']:
+                yield f"data: {json.dumps({'type': 'error', 'message': 'At least one model must be specified'})}\n\n"
+                return
+
+            init_anubis()
+
+            prompt = data['prompt']
+            models = data['models']
+            metrics_priority = data.get('metrics', None)
+
+            generation_results = []
+            models_started = set()
+
+            # Process all models in parallel - chunks arrive from any model as they're ready
+            for chunk_data in code_generator.generate_code_multi_models_stream(prompt, models, metrics_priority):
+                model = chunk_data['model']
+
+                # Send generation start event (once per model)
+                if model not in models_started:
+                    yield f"data: {json.dumps({'type': 'generation_start', 'model': model})}\n\n"
+                    models_started.add(model)
+
+                if not chunk_data['is_complete']:
+                    # Send code chunk
+                    yield f"data: {json.dumps({'type': 'code_chunk', 'model': model, 'chunk': chunk_data['chunk']})}\n\n"
+                else:
+                    # Generation complete for this model
+                    yield f"data: {json.dumps({'type': 'generation_complete', 'model': model, 'success': chunk_data['success'], 'execution_time_ms': chunk_data.get('execution_time_ms', 0)})}\n\n"
+
+                    # Store result for evaluation
+                    generation_results.append(chunk_data)
+
+                    # Evaluate the generated code
+                    if chunk_data['success'] and chunk_data.get('generated_code'):
+                        evaluation = code_evaluator.evaluate(chunk_data['generated_code'], metrics_priority)
+                        evaluation['model'] = model
+
+                        # Send evaluation result
+                        yield f"data: {json.dumps({'type': 'evaluation_result', 'model': model, 'overall_score': evaluation['overall_score'], 'metrics': evaluation['metrics']})}\n\n"
+
+            # Generate final summary
+            evaluations = []
+            for gen_result in generation_results:
+                if gen_result['success']:
+                    code = gen_result.get('generated_code', '')
+                    if code:
+                        evaluation = code_evaluator.evaluate(code, metrics_priority)
+                        evaluation['model'] = gen_result['model']
+                        evaluations.append(evaluation)
+
+            output = OutputFormatter.format_results(prompt, evaluations, generation_results)
+
+            # Send summary
+            yield f"data: {json.dumps({'type': 'summary', 'data': output['summary'], 'ranking': output['ranking']})}\n\n"
+
+            # Send complete event
+            yield f"data: {json.dumps({'type': 'complete'})}\n\n"
+
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+
+    return Response(stream_with_context(generate()), mimetype='text/event-stream')
 
 
 @app.route('/api/v1/evaluate', methods=['POST'])
