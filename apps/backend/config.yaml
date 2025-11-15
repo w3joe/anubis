@@ -1,0 +1,23 @@
+metrics:
+  weights:
+    readability: 0.25
+    consistency: 0.20
+    time_complexity: 0.25
+    code_documentation: 0.15
+    external_dependencies: 0.15
+
+models:
+  available:
+    - gemini-2.0-flash-exp
+    - gemini-2.0-flash
+    - gemini-2.5-flash
+    - gemini-2.5-pro
+    - gemini-pro-latest
+    - gemini-flash-latest
+  default:
+    - gemini-2.0-flash-exp
+    - gemini-2.0-flash
+
+evaluation:
+  timeout: 30
+  max_retries: 3

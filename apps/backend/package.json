@@ -1,0 +1,32 @@
+{
+  "name": "anubis-backend",
+  "version": "1.0.0",
+  "description": "AI Code Comparison & Evaluation System - Flask Backend",
+  "private": true,
+  "scripts": {
+    "dev": "set -a && source .env && set +a && python app.py",
+    "start": "set -a && source .env && set +a && python app.py",
+    "install": "pip install -r requirements.txt",
+    "test": "pytest tests/",
+    "lint": "flake8 anubis/ app.py --max-line-length=100",
+    "format": "black anubis/ app.py",
+    "type-check": "mypy anubis/ app.py"
+  },
+  "keywords": [
+    "ai",
+    "code-evaluation",
+    "gemini",
+    "google-adk",
+    "flask",
+    "python"
+  ],
+  "author": "Anubis Team",
+  "license": "MIT",
+  "engines": {
+    "python": ">=3.12"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yourusername/anubis.git"
+  }
+}
