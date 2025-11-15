@@ -36,7 +36,7 @@ export function MultiSelect<TValue extends string>({
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
+      <PopoverTrigger asChild id="modelSelect">
         <Button
           variant="outline"
           role="combobox"

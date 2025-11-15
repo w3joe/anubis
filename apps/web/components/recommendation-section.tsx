@@ -7,7 +7,18 @@ import {
   CodeBlockBody,
   CodeBlockItem,
   CodeBlockContent,
+  CodeBlockFiles,
+  CodeBlockFilename,
 } from "@/components/ui/shadcn-io/code-block";
+
+// Helper function to clean code fences from code
+function cleanCodeFences(code: string): string {
+  // Remove markdown code fences like ```python or ```
+  return code
+    .replace(/^```[\w]*\n?/gm, "") // Remove opening fence with optional language
+    .replace(/\n?```$/gm, "") // Remove closing fence
+    .trim();
+}
 
 interface RecommendationSectionProps {
   recommendation: Recommendation | null;
@@ -19,6 +30,8 @@ export function RecommendationSection({
   if (!recommendation) {
     return null;
   }
+
+  const cleanCode = cleanCodeFences(recommendation.code);
 
   return (
     <Card className="border-green-300 bg-green-50">
@@ -64,16 +77,24 @@ export function RecommendationSection({
             Recommended Code:
           </p>
           <CodeBlock
+            className="bg-white/75"
             defaultValue="python"
             data={[
               {
                 language: "python",
                 filename: `${recommendation.bestModel}.py`,
-                code: recommendation.code,
+                code: cleanCode,
               },
             ]}
           >
             <CodeBlockHeader>
+              <CodeBlockFiles>
+                {(item) => (
+                  <CodeBlockFilename key={item.language} value={item.language}>
+                    {item.filename}
+                  </CodeBlockFilename>
+                )}
+              </CodeBlockFiles>
               <CodeBlockCopyButton className="ml-auto" />
             </CodeBlockHeader>
             <CodeBlockBody>

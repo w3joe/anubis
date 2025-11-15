@@ -15,6 +15,7 @@ import { ModelOutputCard } from "@/components/model-output-card";
 import { RecommendationSection } from "@/components/recommendation-section";
 import { WarningsSection } from "@/components/warnings-section";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
 // Helper function to generate pros and cons from metrics
 function generateProsAndCons(metrics: EvaluationMetrics): {
@@ -313,8 +314,8 @@ export default function ResultsPage() {
       )}
 
       <div className="w-full flex justify-center pt-6">
-        <Button onClick={handleNewEvaluation} size="lg">
-          New Evaluation
+        <Button size="lg" asChild>
+          <Link href="/">New Evaluation</Link>
         </Button>
       </div>
 
