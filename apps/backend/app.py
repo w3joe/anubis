@@ -145,26 +145,35 @@ def evaluate_code_stream():
     """
     def generate():
         try:
+            print("\n[STREAM] ===== New evaluate/stream request received =====")
             data = request.get_json()
+            print(f"[STREAM] Request data: prompt={data.get('prompt', 'N/A')[:50] if data else 'None'}..., models={data.get('models', []) if data else 'None'}")
 
             # Validate input
             if not data or 'prompt' not in data:
+                print("[STREAM] ERROR: Missing prompt in request body")
                 yield f"data: {json.dumps({'type': 'error', 'message': 'Missing prompt in request body'})}\n\n"
                 return
 
             if not data.get('prompt', '').strip():
+                print("[STREAM] ERROR: Prompt cannot be empty")
                 yield f"data: {json.dumps({'type': 'error', 'message': 'Prompt cannot be empty'})}\n\n"
                 return
 
             if 'models' not in data or not data['models']:
+                print("[STREAM] ERROR: At least one model must be specified")
                 yield f"data: {json.dumps({'type': 'error', 'message': 'At least one model must be specified'})}\n\n"
                 return
 
+            print("[STREAM] Initializing Anubis components...")
             init_anubis()
 
             prompt = data['prompt']
             models = data['models']
             metrics_priority = data.get('metrics', None)
+            print(f"[STREAM] Starting code generation for {len(models)} model(s): {models}")
+            if metrics_priority:
+                print(f"[STREAM] Metrics priority: {metrics_priority}")
 
             generation_results = []
             models_started = set()
@@ -175,26 +184,46 @@ def evaluate_code_stream():
 
                 # Send generation start event (once per model)
                 if model not in models_started:
+                    print(f"[STREAM] ✓ Generation started for model: {model}")
                     yield f"data: {json.dumps({'type': 'generation_start', 'model': model})}\n\n"
                     models_started.add(model)
 
                 if not chunk_data['is_complete']:
                     # Send code chunk
-                    yield f"data: {json.dumps({'type': 'code_chunk', 'model': model, 'chunk': chunk_data['chunk']})}\n\n"
+                    chunk = chunk_data['chunk']
+                    print(f"[STREAM] [{model}] Code chunk received ({len(chunk)} chars)")
+                    yield f"data: {json.dumps({'type': 'code_chunk', 'model': model, 'chunk': chunk})}\n\n"
                 else:
                     # Generation complete for this model
-                    yield f"data: {json.dumps({'type': 'generation_complete', 'model': model, 'success': chunk_data['success'], 'execution_time_ms': chunk_data.get('execution_time_ms', 0)})}\n\n"
+                    success = chunk_data['success']
+                    exec_time = chunk_data.get('execution_time_ms', 0)
+                    print(f"[STREAM] [{model}] Generation complete - Success: {success}, Time: {exec_time}ms")
+                    yield f"data: {json.dumps({'type': 'generation_complete', 'model': model, 'success': success, 'execution_time_ms': exec_time})}\n\n"
 
                     # Store result for evaluation
                     generation_results.append(chunk_data)
 
                     # Evaluate the generated code
                     if chunk_data['success'] and chunk_data.get('generated_code'):
-                        evaluation = code_evaluator.evaluate(chunk_data['generated_code'], metrics_priority)
+                        code = chunk_data.get('generated_code', '')
+                        print(f"[STREAM] [{model}] Evaluating generated code ({len(code)} chars)...")
+                        evaluation = code_evaluator.evaluate(code, metrics_priority)
                         evaluation['model'] = model
+                        print(f"[STREAM] [{model}] Evaluation complete - Overall score: {evaluation['overall_score']:.2f}")
+                        metric_scores = []
+                        for k, v in evaluation['metrics'].items():
+                            if isinstance(v, dict) and 'score' in v:
+                                metric_scores.append(f'{k}={v["score"]:.2f}')
+                            elif isinstance(v, (int, float)):
+                                metric_scores.append(f'{k}={v:.2f}')
+                            else:
+                                metric_scores.append(f'{k}={v}')
+                        print(f"[STREAM] [{model}] Metrics: {', '.join(metric_scores)}")
 
                         # Send evaluation result
                         yield f"data: {json.dumps({'type': 'evaluation_result', 'model': model, 'overall_score': evaluation['overall_score'], 'metrics': evaluation['metrics']})}\n\n"
+                    else:
+                        print(f"[STREAM] [{model}] Skipping evaluation - generation failed or no code generated")
 
             # Generate final summary
             evaluations = []
@@ -212,9 +241,13 @@ def evaluate_code_stream():
             yield f"data: {json.dumps({'type': 'summary', 'data': output['summary'], 'ranking': output['ranking']})}\n\n"
 
             # Send complete event
+            print("[STREAM] ===== Stream complete =====\n")
             yield f"data: {json.dumps({'type': 'complete'})}\n\n"
 
         except Exception as e:
+            print(f"[STREAM] ERROR: {str(e)}")
+            import traceback
+            traceback.print_exc()
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
 
     return Response(stream_with_context(generate()), mimetype='text/event-stream')
