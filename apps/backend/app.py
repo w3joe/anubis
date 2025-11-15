@@ -176,6 +176,7 @@ def evaluate_code_stream():
                 print(f"[STREAM] Metrics priority: {metrics_priority}")
 
             generation_results = []
+            evaluations = []  # Store evaluations during streaming
             models_started = set()
 
             # Process all models in parallel - chunks arrive from any model as they're ready
@@ -204,12 +205,13 @@ def evaluate_code_stream():
                     # Store result for evaluation
                     generation_results.append(chunk_data)
 
-                    # Evaluate the generated code
+                    # Evaluate the generated code (metrics only, no LLM yet)
                     if chunk_data['success'] and chunk_data.get('generated_code'):
                         code = chunk_data.get('generated_code', '')
                         print(f"[STREAM] [{model}] Evaluating generated code ({len(code)} chars)...")
                         evaluation = code_evaluator.evaluate(code, metrics_priority)
                         evaluation['model'] = model
+                        evaluations.append(evaluation)  # Store for later LLM analysis
                         print(f"[STREAM] [{model}] Evaluation complete - Overall score: {evaluation['overall_score']:.2f}")
                         metric_scores = []
                         for k, v in evaluation['metrics'].items():
@@ -220,12 +222,6 @@ def evaluate_code_stream():
                             else:
                                 metric_scores.append(f'{k}={v}')
                         print(f"[STREAM] [{model}] Metrics: {', '.join(metric_scores)}")
-
-                        # Extract LLM analysis results
-                        llm_analysis = evaluation.get('llm_analysis', {})
-                        pros = llm_analysis.get('pros', [])
-                        cons = llm_analysis.get('cons', [])
-                        language = llm_analysis.get('language', 'unknown')
                         
                         # Format metrics (remove notes field from individual metrics)
                         formatted_metrics = {}
@@ -236,20 +232,40 @@ def evaluate_code_stream():
                             if 'dependencies_count' in metric_data:
                                 formatted_metrics[metric_name]['dependencies_count'] = metric_data['dependencies_count']
 
-                        # Send evaluation result with language and notes
-                        yield f"data: {json.dumps({'type': 'evaluation_result', 'model': model, 'overall_score': evaluation['overall_score'], 'language': language, 'metrics': formatted_metrics, 'notes': {'pros': pros, 'cons': cons}})}\n\n"
+                        # Send evaluation result (without LLM analysis yet)
+                        yield f"data: {json.dumps({'type': 'evaluation_result', 'model': model, 'overall_score': evaluation['overall_score'], 'metrics': formatted_metrics})}\n\n"
                     else:
                         print(f"[STREAM] [{model}] Skipping evaluation - generation failed or no code generated")
 
-            # Generate final summary
-            evaluations = []
-            for gen_result in generation_results:
-                if gen_result['success']:
-                    code = gen_result.get('generated_code', '')
-                    if code:
-                        evaluation = code_evaluator.evaluate(code, metrics_priority)
-                        evaluation['model'] = gen_result['model']
-                        evaluations.append(evaluation)
+            # All generation complete - now run LLM analysis for all models
+            print("[STREAM] All code generation complete. Starting LLM analysis...")
+            
+            # Run LLM analysis on all generated codes
+            for evaluation in evaluations:
+                model = evaluation['model']
+                # Find matching generation result
+                gen_result = next((g for g in generation_results if g['model'] == model), None)
+                if gen_result and gen_result.get('generated_code'):
+                    code = gen_result['generated_code']
+                    print(f"[STREAM] [{model}] Running LLM analysis...")
+                    llm_analysis = code_evaluator.analyze_llm(code)
+                    evaluation['llm_analysis'] = llm_analysis
+                    
+                    # Send updated evaluation result with LLM analysis
+                    pros = llm_analysis.get('pros', [])
+                    cons = llm_analysis.get('cons', [])
+                    language = llm_analysis.get('language', 'unknown')
+                    
+                    # Format metrics
+                    formatted_metrics = {}
+                    for metric_name, metric_data in evaluation['metrics'].items():
+                        formatted_metrics[metric_name] = {'score': metric_data.get('score', 0)}
+                        if 'detected_complexity' in metric_data:
+                            formatted_metrics[metric_name]['detected_complexity'] = metric_data['detected_complexity']
+                        if 'dependencies_count' in metric_data:
+                            formatted_metrics[metric_name]['dependencies_count'] = metric_data['dependencies_count']
+                    
+                    yield f"data: {json.dumps({'type': 'evaluation_result', 'model': model, 'overall_score': evaluation['overall_score'], 'language': language, 'metrics': formatted_metrics, 'notes': {'pros': pros, 'cons': cons}})}\n\n"
 
             output = OutputFormatter.format_results(prompt, evaluations, generation_results)
 
@@ -324,8 +340,18 @@ def evaluate_code():
                     'metrics': {},
                     'error': gen_result['error']
                 })
+        
+        # Step 3: Run LLM analysis after all code generation is complete
+        for evaluation in evaluations:
+            model = evaluation['model']
+            # Find matching generation result
+            gen_result = next((g for g in generation_results if g['model'] == model), None)
+            if gen_result and gen_result.get('success') and gen_result.get('generated_code'):
+                code = gen_result['generated_code']
+                llm_analysis = code_evaluator.analyze_llm(code)
+                evaluation['llm_analysis'] = llm_analysis
 
-        # Step 3: Format output (FR-15 through FR-19)
+        # Step 4: Format output (FR-15 through FR-19)
         output = OutputFormatter.format_results(prompt, evaluations, generation_results)
 
         return jsonify(output), 200

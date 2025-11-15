@@ -79,16 +79,12 @@ class CodeEvaluator:
         for metric_name, analyzer in self.analyzers.items():
             metrics[metric_name] = analyzer.analyze(code)
 
-        # Run LLM analyzer for pros/cons and language analysis
-        llm_analysis = self.llm_analyzer.analyze(code)
-
         # Calculate overall score with dynamic weights
         overall_score = self._calculate_overall_score(metrics, metrics_priority)
 
         return {
             'metrics': metrics,
-            'overall_score': round(overall_score, 2),
-            'llm_analysis': llm_analysis
+            'overall_score': round(overall_score, 2)
         }
 
     def evaluate_multiple(self, code_samples: List[Dict[str, str]]) -> List[Dict[str, any]]:
@@ -177,3 +173,16 @@ class CodeEvaluator:
         }
 
         return normalized_weights
+
+    def analyze_llm(self, code: str) -> Dict[str, any]:
+        """
+        Analyze code using LLM analyzer for pros, cons, and language.
+        This should be called after all code generation is complete.
+
+        Args:
+            code: The code to analyze.
+
+        Returns:
+            Dictionary containing pros, cons, and language.
+        """
+        return self.llm_analyzer.analyze(code)
