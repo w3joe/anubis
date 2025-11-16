@@ -29,6 +29,8 @@ Anubis automates the entire workflow:
 4. **Objective Ranking**: Produces a final weighted score for each generated code and ranks them objectively
 5. **Best Code Surface**: Automatically surfaces the best code based on your priorities
 
+https://github.com/user-attachments/assets/b94d51f0-d8a7-42d3-9ebe-23efdf90fc99
+
 **Result**: Fast, consistent, and objective code comparison that scales.
 
 ## 🏗️ Architecture
